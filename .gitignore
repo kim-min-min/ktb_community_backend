@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+uploads/
+post_uploads/
+
+
 # C extensions
 *.so
 
