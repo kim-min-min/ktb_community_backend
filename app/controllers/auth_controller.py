@@ -3,8 +3,9 @@ from fastapi import HTTPException, UploadFile
 import re
 import uuid
 import os
+from app.models import user_model
 
-TEMP_USERS: list[dict] = []
+
 
 # 업로드 파일 저장 폴더
 UPLOAD_DIR = "uploads"
@@ -47,12 +48,8 @@ def login_controller(payload: dict) -> dict:
             "message": "*비밀번호는 8~20자입니다."
         }
 
-    # 3) TEMP_USERS 에서 사용자 찾기
-    user = None
-    for u in TEMP_USERS:
-        if u["email"] == email:
-            user = u
-            break
+    # 3) 사용자 찾기
+    user = user_model.get_user_by_email(email)
 
     if user is None:
         return {
@@ -130,12 +127,12 @@ async def signup_controller(payload: dict, profile_image: UploadFile):
 
 
     # 5. 회원 정보를 임시 저장소(TEMP_USERS)에 저장
-    TEMP_USERS.append({
-        "email": email,
-        "password": password,  
-        "nickname": nickname,
-        "profile_image_path": file_path,
-    })
+    user_model.create_user(
+        email=email,
+        password=password,
+        nickname=nickname,
+        profile_image_path=file_path,
+    )
 
     # ---------------------------
     # 6. 회원가입 성공 응답
@@ -157,11 +154,7 @@ async def update_profile_controller(payload: dict, profile_image: UploadFile | N
     nickname = (payload.get("nickname") or "").strip()
 
     # 1) 이메일로 유저 찾기
-    user = None
-    for u in TEMP_USERS:
-        if u["email"] == email:
-            user = u
-            break
+    user = user_model.get_user_by_email(email)
 
     if user is None:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
@@ -174,8 +167,9 @@ async def update_profile_controller(payload: dict, profile_image: UploadFile | N
         raise HTTPException(status_code=400, detail="닉네임은 최대 10자까지 작성 가능합니다.")
 
     # 닉네임 중복 (본인 제외)
-    if any(u["nickname"] == nickname and u["email"] != email for u in TEMP_USERS):
+    if user_model.is_nickname_duplicated(nickname, exclude_email=email):
         raise HTTPException(status_code=400, detail="중복된 닉네임 입니다.")
+
 
     # 3) 프로필 이미지 처리
     if profile_image is not None and profile_image.filename:
@@ -216,11 +210,7 @@ def delete_account_controller(email: str) -> dict:
         raise HTTPException(status_code=400, detail="이메일이 필요합니다.")
 
     # 1) 유저 찾기
-    target = None
-    for u in TEMP_USERS:
-        if u["email"] == email:
-            target = u
-            break
+    target = user_model.delete_user_by_email(email)
 
     if target is None:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
@@ -233,8 +223,6 @@ def delete_account_controller(email: str) -> dict:
         except OSError:
             pass
 
-    # 3) TEMP_USERS 에서 제거
-    TEMP_USERS.remove(target)
 
     return {
         "message": "회원 탈퇴가 완료되었습니다.",
@@ -251,11 +239,7 @@ def update_password_controller(payload: dict) -> dict:
     new_pw_confirm = payload.get("new_password_confirm") or ""
 
     # 1) 사용자 찾기
-    user = None
-    for u in TEMP_USERS:
-        if u["email"] == email:
-            user = u
-            break
+    user = user_model.get_user_by_email(email)
 
     if user is None:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
@@ -282,7 +266,7 @@ def update_password_controller(payload: dict) -> dict:
         raise HTTPException(status_code=400, detail="기존 비밀번호와 동일한 비밀번호는 사용할 수 없습니다.")
 
     # 5) 비밀번호 업데이트
-    user["password"] = new_pw
+    user_model.update_user_password(email, new_pw)
 
     return {
         "message": "비밀번호가 성공적으로 수정되었습니다.",
