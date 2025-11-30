@@ -1,6 +1,7 @@
-# app/routes/auth_route.py
-from fastapi import APIRouter, Form, File, UploadFile
-from pydantic import BaseModel
+from fastapi import APIRouter, Form, File, UploadFile, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
+from pydantic import BaseModel 
 
 from app.controllers.auth_controller import (
     login_controller,
@@ -12,7 +13,7 @@ from app.controllers.auth_controller import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# ---- BaseModel ----
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -20,67 +21,62 @@ class LoginRequest(BaseModel):
 
 # ---- 로그인 API ----
 @router.post("/login")
-def login(payload: LoginRequest):
-
-    # BaseModel → dict 로 변환해서 controller로 넘김
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
     data = payload.dict()
+    return login_controller(db, data)
 
-    return login_controller(data)
 
-
-# ---------- 회원가입 API (이미지 업로드 포함) ----------
+# ---- 회원가입 ----
 @router.post("/signup")
 async def signup(
     email: str = Form(...),
     password: str = Form(...),
     password_confirm: str = Form(...),
     nickname: str = Form(...),
-    profile_image: UploadFile = File(...)
+    profile_image: UploadFile = File(...),
+    db: Session = Depends(get_db),
 ):
-
     payload = {
         "email": email,
         "password": password,
         "password_confirm": password_confirm,
         "nickname": nickname,
     }
-
-    # dict + UploadFile 을 controller로 넘김
-    return await signup_controller(payload, profile_image)
+    return await signup_controller(db, payload, profile_image)
 
 
-# ---------- 회원정보 수정 API ----------
+# ---- 회원정보 수정 ----
 @router.put("/profile")
 async def update_profile(
-    email: str = Form(...),                  
+    email: str = Form(...),
     nickname: str = Form(...),
-    profile_image: UploadFile | None = File(None),  
+    profile_image: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
 ):
-    payload = {
-        "email": email,
-        "nickname": nickname,
-    }
-    return await update_profile_controller(payload, profile_image)
+    payload = {"email": email, "nickname": nickname}
+    return await update_profile_controller(db, payload, profile_image)
 
 
-# ---------- 회원 탈퇴 API ----------
+# ---- 회원 탈퇴 ----
 @router.delete("/profile")
 def delete_profile(
-    email: str = Form(...),   # 프론트에서 현재 로그인 중인 유저 이메일을 넘겨줌
+    email: str = Form(...),
+    db: Session = Depends(get_db),
 ):
-    return delete_account_controller(email)
+    return delete_account_controller(db, email)
 
 
-# ---------- 비밀번호 수정 API ----------
+# ---- 비밀번호 변경 ----
 @router.put("/password")
 def update_password(
     email: str = Form(...),
     new_password: str = Form(...),
     new_password_confirm: str = Form(...),
+    db: Session = Depends(get_db),
 ):
     payload = {
         "email": email,
         "new_password": new_password,
         "new_password_confirm": new_password_confirm,
     }
-    return update_password_controller(payload)
+    return update_password_controller(db, payload)
