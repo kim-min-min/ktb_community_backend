@@ -2,6 +2,9 @@
 from fastapi import APIRouter, Form, File, UploadFile, Body, Depends
 from sqlalchemy.orm import Session
 
+from app.dependencies.auth import get_current_user
+from app.models.user_model import User
+
 from app.database import get_db
 from app.controllers.post_controller import (
     list_posts_controller,
@@ -34,6 +37,7 @@ def get_post(post_id: int, db: Session = Depends(get_db)):
     return get_post_detail_controller(db, post_id)
 
 
+
 # -----------------------------
 # 게시글 작성
 # -----------------------------
@@ -43,8 +47,15 @@ async def create_post(
     content: str = Form(...),
     image_file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),  
 ):
-    return await create_post_controller(db, title, content, image_file)
+    return await create_post_controller(
+        db=db,
+        title=title,
+        content=content,
+        image_file=image_file,
+        user=current_user,                         
+    )
 
 
 # -----------------------------
@@ -54,9 +65,36 @@ async def create_post(
 def delete_post(
     post_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),   
 ):
-    return delete_post_controller(db, post_id)
+    return delete_post_controller(
+        db=db,
+        post_id=post_id,
+        user=current_user,                          
+    )
 
+
+# -----------------------------
+# 게시글 수정
+# -----------------------------
+@router.put("/{post_id}")
+async def update_post(
+    post_id: int,
+    title: str = Form(...),
+    content: str = Form(...),
+    image: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),   
+):
+    return await update_post_controller(
+        db=db,
+        post_id=post_id,
+        title=title,
+        content=content,
+        image=image,
+        user=current_user,                           
+    )
+    
 
 # -----------------------------
 # 좋아요 토글
@@ -70,21 +108,28 @@ def toggle_like(
     return toggle_like_controller(db, post_id, liked)
 
 
+
 # -----------------------------
-# 댓글 등록
+# 댓글 등록 (로그인 필요)
 # -----------------------------
 @router.post("/{post_id}/comments")
 def add_comment(
     post_id: int,
     content: str = Form(...),
-    writer: str = Form("더미 작성자 1"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),   
 ):
-    return add_comment_controller(db, post_id, content, writer)
+    return add_comment_controller(
+        db=db,
+        post_id=post_id,
+        content=content,
+        user=current_user,                           
+    )
+
 
 
 # -----------------------------
-# 댓글 수정
+# 댓글 수정 (로그인 필요)
 # -----------------------------
 @router.put("/{post_id}/comments/{comment_id}")
 def update_comment(
@@ -92,31 +137,36 @@ def update_comment(
     comment_id: int,
     content: str = Form(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),   
 ):
-    return update_comment_controller(db, post_id, comment_id, content)
+    return update_comment_controller(
+        db=db,
+        post_id=post_id,
+        comment_id=comment_id,
+        content=content,
+        user=current_user,                             
+    )
+
 
 
 # -----------------------------
-# 댓글 삭제
+# 댓글 삭제 (로그인 필요)
 # -----------------------------
 @router.delete("/{post_id}/comments/{comment_id}")
 def delete_comment(
     post_id: int,
     comment_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),  
 ):
-    return delete_comment_controller(db, post_id, comment_id)
+    return delete_comment_controller(
+        db=db,
+        post_id=post_id,
+        comment_id=comment_id,
+        user=current_user,                            
+    )
 
 
-# -----------------------------
-# 게시글 수정
-# -----------------------------
-@router.put("/{post_id}")
-async def update_post(
-    post_id: int,
-    title: str = Form(...),
-    content: str = Form(...),
-    image: UploadFile | None = File(None),
-    db: Session = Depends(get_db),
-):
-    return await update_post_controller(db, post_id, title, content, image)
+
+
+

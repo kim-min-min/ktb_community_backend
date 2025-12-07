@@ -1,9 +1,6 @@
-# app/models/post_model.py
 from datetime import datetime
-
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-
 from app.database import Base   
 
 
@@ -18,6 +15,12 @@ class Post(Base):
     views = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # 글쓴이 (User FK)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # 관계 설정 (User ↔ Post)
+    author = relationship("User", backref="posts")
+
     # 댓글 리스트 (1 : N)
     comments = relationship(
         "Comment",
@@ -31,9 +34,16 @@ class Comment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"))
-    writer = Column(String(50), nullable=True)
+
+    # 댓글 작성자 (User FK)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # 화면에 보여줄 닉네임
+    writer = Column(String(50), nullable=False)
+
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Post 객체와 역참조
+    # 관계
     post = relationship("Post", back_populates="comments")
+    author = relationship("User", backref="comments")

@@ -1,4 +1,3 @@
-# app/crud/post_crud.py
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -26,6 +25,7 @@ def create_post(
     title: str,
     content: str,
     image_path: str | None,
+    user_id: int,          # 작성자 ID
 ) -> Post:
     """게시글 생성 후 DB 저장"""
     new_post = Post(
@@ -34,6 +34,7 @@ def create_post(
         image_path=image_path,
         likes=0,
         views=0,
+        user_id=user_id,   # FK 저장
     )
     db.add(new_post)
     db.commit()
@@ -77,9 +78,17 @@ def update_post(
     title: str,
     content: str,
     new_image_path: str | None,
+    user_id: int,                 # 요청한 사용자 ID
 ) -> Post:
-    """게시글 제목/내용/이미지 경로 수정"""
+    """
+    게시글 제목/내용/이미지 경로 수정
+    - 작성자 본인인지 체크
+    """
     post = get_post_or_404(db, post_id)
+
+    # 권한 체크
+    if post.user_id != user_id:
+        raise HTTPException(status_code=403, detail="본인이 작성한 게시글만 수정할 수 있습니다.")
 
     post.title = title
     post.content = content
@@ -92,7 +101,13 @@ def update_post(
 
 
 def delete_post(db: Session, post_id: int) -> Post:
-    """게시글 삭제 후 삭제된 Post 반환"""
+    """
+    게시글 삭제 후 삭제된 Post 반환
+
+    권한 체크는 컨트롤러에서:
+        - get_post_or_404 로 post 가져오고
+        - post.user_id == current_user.id 확인
+    """
     post = get_post_or_404(db, post_id)  # 없으면 404
 
     db.delete(post)
@@ -108,17 +123,18 @@ def add_comment(
     db: Session,
     post_id: int,
     content: str,
-    writer: str | None = None,
+    user_id: int,              # 작성자 ID
+    writer: str,               # 화면에 보여줄 닉네임
 ) -> dict:
     """
     댓글 추가 후 (post, comment) 를 dict 로 반환
-    (기존 메모리 버전 인터페이스랑 맞추려고 dict 형태 유지)
     """
     post = get_post_or_404(db, post_id)
 
     comment = Comment(
         post_id=post.id,
-        writer=writer or "더미 작성자 1",
+        user_id=user_id,       # FK
+        writer=writer,
         content=content,
     )
     db.add(comment)
@@ -137,8 +153,9 @@ def update_comment(
     post_id: int,
     comment_id: int,
     content: str,
+    user_id: int,              # 요청한 사용자 ID
 ) -> Comment:
-    """댓글 내용 수정 후 수정된 comment 반환"""
+    """댓글 내용 수정 후 수정된 comment 반환 (작성자 본인만)"""
     comment = (
         db.query(Comment)
         .filter(Comment.id == comment_id, Comment.post_id == post_id)
@@ -146,6 +163,10 @@ def update_comment(
     )
     if comment is None:
         raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
+
+    # 권한 체크
+    if comment.user_id != user_id:
+        raise HTTPException(status_code=403, detail="본인이 작성한 댓글만 수정할 수 있습니다.")
 
     comment.content = content
     db.commit()
@@ -153,8 +174,13 @@ def update_comment(
     return comment
 
 
-def delete_comment(db: Session, post_id: int, comment_id: int) -> int:
-    """댓글 삭제 후 남은 댓글 개수 반환"""
+def delete_comment(
+    db: Session,
+    post_id: int,
+    comment_id: int,
+    user_id: int,              # 요청한 사용자 ID
+) -> int:
+    """댓글 삭제 후 남은 댓글 개수 반환 (작성자 본인만)"""
     comment = (
         db.query(Comment)
         .filter(Comment.id == comment_id, Comment.post_id == post_id)
@@ -162,6 +188,10 @@ def delete_comment(db: Session, post_id: int, comment_id: int) -> int:
     )
     if comment is None:
         raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
+
+    # 권한 체크
+    if comment.user_id != user_id:
+        raise HTTPException(status_code=403, detail="본인이 작성한 댓글만 삭제할 수 있습니다.")
 
     db.delete(comment)
     db.commit()

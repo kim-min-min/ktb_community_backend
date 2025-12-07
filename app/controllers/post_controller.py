@@ -15,6 +15,7 @@ from app.crud.post_crud import (
     update_comment,
     delete_comment,
 )
+from app.models.user_model import User   # 추가
 
 POST_UPLOAD_DIR = "post_uploads"
 os.makedirs(POST_UPLOAD_DIR, exist_ok=True)
@@ -29,13 +30,14 @@ def list_posts_controller(db: Session) -> dict:
 
 
 # -----------------------------
-# 게시글 추가
+# 게시글 추가 (로그인 유저 사용)
 # -----------------------------
 async def create_post_controller(
     db: Session,
     title: str,
     content: str,
-    image_file: UploadFile | None
+    image_file: UploadFile | None,
+    user: User,                       # 현재 로그인 유저
 ) -> dict:
 
     title = title.strip()
@@ -65,7 +67,8 @@ async def create_post_controller(
         with open(image_path, "wb") as f:
             f.write(await image_file.read())
 
-    post = create_post(db, title, content, image_path)
+    # ✅ user.id 를 함께 넘겨서 user_id 컬럼에 저장하도록
+    post = create_post(db, title, content, image_path, user_id=user.id)
 
     return {"success": True, "message": "게시글이 등록되었습니다.", "post": post}
 
@@ -78,18 +81,23 @@ def get_post_detail_controller(db: Session, post_id: int) -> dict:
     return {"success": True, "post": post}
 
 
-
-
 # -----------------------------
-# 게시글 삭제
+# 게시글 삭제 (작성자만 가능)
 # -----------------------------
-def delete_post_controller(db: Session, post_id: int) -> dict:
-    post = delete_post(db, post_id)
+def delete_post_controller(db: Session, post_id: int, user: User) -> dict:
+    # 우선 게시글을 가져와서 작성자인지 확인
+    post = get_post_or_404(db, post_id)
+
+    if post.user_id != user.id:
+        raise HTTPException(status_code=403, detail="본인이 작성한 게시글만 삭제할 수 있습니다.")
+
+    # 실제 삭제
+    deleted_post = delete_post(db, post_id)
 
     # 이미지 파일 같이 지우기 (있으면)
-    if post.image_path and os.path.exists(post.image_path):
+    if deleted_post.image_path and os.path.exists(deleted_post.image_path):
         try:
-            os.remove(post.image_path)
+            os.remove(deleted_post.image_path)
         except OSError:
             pass
 
@@ -101,7 +109,7 @@ def delete_post_controller(db: Session, post_id: int) -> dict:
 
 
 # -----------------------------
-# 좋아요 토글
+# 좋아요 토글 (로그인 여부는 선택)
 # -----------------------------
 def toggle_like_controller(db: Session, post_id: int, liked_now: bool) -> dict:
     post = toggle_like(db, post_id, liked_now)
@@ -109,44 +117,82 @@ def toggle_like_controller(db: Session, post_id: int, liked_now: bool) -> dict:
 
 
 # -----------------------------
-# 댓글 등록
+# 댓글 등록 (로그인 유저만)
 # -----------------------------
-def add_comment_controller(db: Session, post_id: int, content: str, writer: str | None) -> dict:
+def add_comment_controller(
+    db: Session,
+    post_id: int,
+    content: str,
+    user: User,          # 로그인 유저
+) -> dict:
     if not content.strip():
         raise HTTPException(400, "댓글 내용을 입력해주세요.")
 
-    data = add_comment(db, post_id, content, writer)
+    # writer는 화면용 닉네임, user_id는 FK
+    data = add_comment(
+        db=db,
+        post_id=post_id,
+        content=content,
+        user_id=user.id,             # FK
+        writer=user.nickname,        # 화면 표시용
+    )
+
     return {"success": True, "comment": data["comment"]}
 
 
 # -----------------------------
-# 댓글 수정
+# 댓글 수정 (작성자만)
 # -----------------------------
-def update_comment_controller(db: Session, post_id: int, comment_id: int, content: str) -> dict:
+def update_comment_controller(
+    db: Session,
+    post_id: int,
+    comment_id: int,
+    content: str,
+    user: User,          # 로그인 유저
+) -> dict:
     if not content.strip():
         raise HTTPException(400, "댓글 내용을 입력해주세요.")
 
-    comment = update_comment(db, post_id, comment_id, content)
+    # 컨트롤러에서 직접 권한 체크할 수도 있고,
+    # crud에서 user_id를 받아서 체크하도록 할 수도 있음.
+    comment = update_comment(
+        db=db,
+        post_id=post_id,
+        comment_id=comment_id,
+        content=content,
+        user_id=user.id,    # 본인 댓글인지 crud쪽에서 확인 가능하게
+    )
     return {"success": True, "comment": comment}
 
 
 # -----------------------------
-# 댓글 삭제
+# 댓글 삭제 (작성자만)
 # -----------------------------
-def delete_comment_controller(db: Session, post_id: int, comment_id: int) -> dict:
-    remaining = delete_comment(db, post_id, comment_id)
+def delete_comment_controller(
+    db: Session,
+    post_id: int,
+    comment_id: int,
+    user: User,          # 로그인 유저
+) -> dict:
+    remaining = delete_comment(
+        db=db,
+        post_id=post_id,
+        comment_id=comment_id,
+        user_id=user.id,       # 본인 댓글인지 crud에서 체크하도록
+    )
     return {"success": True, "remaining_comments": remaining}
 
 
 # -----------------------------
-# 게시글 수정
+# 게시글 수정 (작성자만)
 # -----------------------------
 async def update_post_controller(
     db: Session,
     post_id: int,
     title: str,
     content: str,
-    image_file: UploadFile | None
+    image_file: UploadFile | None,
+    user: User,          # 로그인 유저
 ) -> dict:
 
     title = title.strip()
@@ -175,6 +221,14 @@ async def update_post_controller(
         with open(new_image_path, "wb") as f:
             f.write(await image_file.read())
 
-    post = update_post(db, post_id, title, content, new_image_path)
+    # 수정 시에도 작성자인지 체크하도록 user_id 함께 전달
+    post = update_post(
+        db=db,
+        post_id=post_id,
+        title=title,
+        content=content,
+        image_path=new_image_path,
+        user_id=user.id,      # 작성자 검증용
+    )
 
     return {"success": True, "message": "게시글이 수정되었습니다.", "post": post}
