@@ -1,5 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from typing import List
+
 
 from app.models.post_model import Post, Comment
 
@@ -15,9 +17,23 @@ def get_post_or_404(db: Session, post_id: int) -> Post:
     return post
 
 
-def list_posts_desc(db: Session) -> list[Post]:
-    """id 역순으로 전체 게시글 조회"""
-    return db.query(Post).order_by(Post.id.desc()).all()
+from sqlalchemy.orm import joinedload
+
+def list_posts_cursor(
+    db: Session,
+    last_id: int | None,
+    size: int,
+) -> List[Post]:
+    query = (
+        db.query(Post)
+        .options(joinedload(Post.user))   # 작성자 정보 함께 로딩
+        .order_by(Post.id.desc())
+    )
+
+    if last_id is not None:
+        query = query.filter(Post.id < last_id)
+
+    return query.limit(size).all()
 
 
 def create_post(

@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 import os, uuid
 
 from app.crud.post_crud import (
-    list_posts_desc,
     create_post,
     delete_post, 
     get_post_or_404,
@@ -14,6 +13,7 @@ from app.crud.post_crud import (
     add_comment,
     update_comment,
     delete_comment,
+    list_posts_cursor
 )
 from app.models.user_model import User   # 추가
 
@@ -24,9 +24,38 @@ os.makedirs(POST_UPLOAD_DIR, exist_ok=True)
 # -----------------------------
 # 게시글 목록 조회
 # -----------------------------
-def list_posts_controller(db: Session) -> dict:
-    posts = list_posts_desc(db)
-    return {"success": True, "posts": posts}
+def list_posts_controller(
+    db: Session,
+    last_id: int | None,
+    size: int,
+) -> dict:
+    posts = list_posts_cursor(db, last_id, size)
+
+    result: list[dict] = []
+    for p in posts:
+        result.append(
+            {
+                "id": p.id,
+                "title": p.title,
+                "content": p.content,
+                "image_path": p.image_path,
+                "likes": p.likes,
+                "views": p.views,
+                "created_at": p.created_at,
+                "user_id": p.user_id,
+                "user_nickname": p.user.nickname if p.user else None,  
+            }
+        )
+
+    next_last_id = posts[-1].id if posts else None
+
+    return {
+        "success": True,
+        "posts": result,                   # ORM 말고 순수 dict 리스트
+        "last_id": next_last_id,
+        "has_more": next_last_id is not None,
+    }
+
 
 
 # -----------------------------
@@ -67,7 +96,7 @@ async def create_post_controller(
         with open(image_path, "wb") as f:
             f.write(await image_file.read())
 
-    # ✅ user.id 를 함께 넘겨서 user_id 컬럼에 저장하도록
+    # user.id 를 함께 넘겨서 user_id 컬럼에 저장하도록
     post = create_post(db, title, content, image_path, user_id=user.id)
 
     return {"success": True, "message": "게시글이 등록되었습니다.", "post": post}
@@ -78,7 +107,40 @@ async def create_post_controller(
 # -----------------------------
 def get_post_detail_controller(db: Session, post_id: int) -> dict:
     post = increase_views(db, post_id)
-    return {"success": True, "post": post}
+
+    # 댓글을 created_at 기준으로 정렬하고 싶으면:
+    comments = sorted(post.comments, key=lambda c: c.created_at)
+
+    comment_list: list[dict] = []
+    for c in comments:
+        comment_list.append(
+            {
+                "id": c.id,
+                "post_id": c.post_id,
+                "content": c.content,
+                "writer": c.writer,        # 화면에 보여줄 닉네임
+                "user_id": c.user_id,      # 작성자 FK
+                "created_at": c.created_at,
+            }
+        )
+
+    post_dict = {
+        "id": post.id,
+        "title": post.title,
+        "content": post.content,
+        "image_path": post.image_path,
+        "likes": post.likes,
+        "views": post.views,
+        "created_at": post.created_at,
+        "user_id": post.user_id,
+        "user_nickname": post.user.nickname if post.user else None,
+        "comments": comment_list,     
+    }
+
+    return {
+        "success": True,
+        "post": post_dict,
+    }
 
 
 # -----------------------------
@@ -227,7 +289,7 @@ async def update_post_controller(
         post_id=post_id,
         title=title,
         content=content,
-        image_path=new_image_path,
+        new_image_path=new_image_path,
         user_id=user.id,      # 작성자 검증용
     )
 

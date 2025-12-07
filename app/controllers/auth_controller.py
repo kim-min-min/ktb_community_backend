@@ -196,12 +196,7 @@ async def update_profile_controller(
     # 4) DB 변경
     user = update_user_profile(db, user, nickname, profile_image_path)
 
-    return {
-        "message": "회원정보가 수정되었습니다.",
-        "email": user.email,
-        "nickname": user.nickname,
-        "profile_image_path": user.profile_image_path,
-    }
+    return user
 
 
 # -----------------------------

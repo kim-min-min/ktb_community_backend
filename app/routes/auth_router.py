@@ -46,6 +46,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             "id": user.id,
             "email": user.email,
             "nickname": user.nickname,
+            "profile_image_path": user.profile_image_path
         },
     }
 
@@ -77,11 +78,15 @@ def read_me(current_user: User = Depends(get_current_user)):
     Authorization: Bearer <token> 필요
     """
     return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "nickname": current_user.nickname,
-        "profile_image": current_user.profile_image_path,
+        "success": True,
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "nickname": current_user.nickname,
+            "profile_image_path": current_user.profile_image_path,
+        }
     }
+
 
 
 # ---- 회원정보 수정 ----
@@ -90,16 +95,25 @@ async def update_profile(
     nickname: str = Form(...),
     profile_image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),  
+    current_user: User = Depends(get_current_user),
 ):
-    payload = {"nickname": nickname}
-    return await update_profile_controller(
+
+    updated_user = await update_profile_controller(
         db=db,
-        user=current_user,          
-        payload=payload,
+        user=current_user,
+        payload={"nickname": nickname},
         profile_image=profile_image,
     )
 
+    return {
+        "success": True,
+        "user": {
+            "id": updated_user.id,
+            "email": updated_user.email,
+            "nickname": updated_user.nickname,
+            "profile_image_path": updated_user.profile_image_path
+        }
+    }
 
 # ---- 회원 탈퇴 ----
 @router.delete("/profile")

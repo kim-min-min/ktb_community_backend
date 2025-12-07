@@ -1,5 +1,5 @@
 # app/routes/post_router.py
-from fastapi import APIRouter, Form, File, UploadFile, Body, Depends
+from fastapi import APIRouter, Form, File, UploadFile, Body, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.dependencies.auth import get_current_user
@@ -22,18 +22,27 @@ router = APIRouter(prefix="/posts", tags=["posts"])
 
 
 # -----------------------------
-# 게시글 목록 조회
+# 게시글 목록 조회 (커서 기반)
 # -----------------------------
 @router.get("")
-def list_posts(db: Session = Depends(get_db)):
-    return list_posts_controller(db)
+def list_posts(
+    last_id: int | None = Query(None, ge=1),
+    size: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return list_posts_controller(db=db, last_id=last_id, size=size)
 
 
 # -----------------------------
 # 게시글 상세 조회
 # -----------------------------
 @router.get("/{post_id}")
-def get_post(post_id: int, db: Session = Depends(get_db)):
+def get_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),  
+):
     return get_post_detail_controller(db, post_id)
 
 
@@ -82,7 +91,7 @@ async def update_post(
     post_id: int,
     title: str = Form(...),
     content: str = Form(...),
-    image: UploadFile | None = File(None),
+    image_file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),   
 ):
@@ -91,7 +100,7 @@ async def update_post(
         post_id=post_id,
         title=title,
         content=content,
-        image=image,
+        image_file=image_file,
         user=current_user,                           
     )
     
@@ -104,6 +113,7 @@ def toggle_like(
     post_id: int,
     liked: bool = Body(..., embed=True),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),   
 ):
     return toggle_like_controller(db, post_id, liked)
 
