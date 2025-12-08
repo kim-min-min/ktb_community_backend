@@ -1,94 +1,152 @@
-## 🎉 심야톡방 – 익명 기반 실시간 커뮤니티 서비스
+# 🌙 심야톡방
+
+## Back-end 소개
+
+- 2030 사용자가 밤에 편하게 아무 말이든 털어놓을 수 있는 익명 커뮤니티 서비스입니다.
+- FastAPI로 REST API 서버를 구현하고, MySQL을 RDBMS로 사용했습니다.
+- JWT 기반 인증, 게시글/댓글 CRUD, 이미지 업로드, 실제 서비스에 필요한 기능들을 처음부터 끝까지 직접 구현했습니다.
+- Router–Controller–CRUD–Model 패턴으로 구조를 나누고, Docker + Nginx로 컨테이너화하여 AWS EC2에 배포했습니다.
+
+### 개발 인원 및 기간
+
+- 개발기간 :  2025-11-03 ~ 2025-12-07
+- 개발 인원 : 프론트엔드/백엔드 1명 (본인)
+
+### 사용 기술 및 tools
+- MySQL
+- FastAPI
+- Docker
+- Nginx
+- AWS
+
+
+### Front-end
+- <a href="https://github.com/kim-min-min/ktb_community_frontend">Front-end Github</a>
+
+### 서비스 시연 영상
+- <a href="https://youtu.be/q1ynQzCd8ew?si=9sB9tTtQmSvPlvr6">유튜브</a>
+
+### 폴더 구조
+<details>
+  <summary>폴더 구조 보기/숨기기</summary>
+  <div markdown="1">
+    
+      ├── README.md
+      ├── package-lock.json
+      ├── package.json
+      ├── app.js
+      ├── .prettierrc
+      ├── config
+      │    └── mysql.cjs
+      ├── controller
+      │    ├── comment-controller.cjs
+      │    ├── post-controller.cjs
+      │    └── user-controller.cjs
+      ├── images
+      │    ├── post/
+      │    └── profile/
+      ├── middleware
+      │    ├── authUser.cjs
+      │    └── validation.cjs
+      ├── model
+      │    ├── comments.cjs
+      │    ├── posts.cjs
+      │    └── users.cjs
+      ├── queries
+      │    ├── comments.cjs
+      │    ├── posts.cjs
+      │    └── users.cjs
+      ├── routes
+      │    ├── comment.cjs
+      │    ├── post.cjs
+      │    ├── user.cjs
+      │     postImage.cjs
+      │    └── profileImage.cjs
+      └── tools
+           ├── queryUtils.cjs
+           └── dataUtils.js
+  </div>
+</details> 
+
+<br/>
+
+## 서버 설계
+### 서버 구조
+||route|controller|model|
+|:---|:---|:---|:---|
+|유저|userRouter|userController|userModel|
+|게시글|postRouter|postController|postModel|
+|댓글|commentRouter|commentController|commentModal|
+|게시글이미지|postImageRouter|-|-|
+|프로필이미지|profileImageRouter|-|-|
+
+### 구현 기능
+
+#### Users
+```
+- 유저 CRUD 기능 구현
+- 회원가입, 로그인, 비밀번호 변경 시 bcrypt로 비밀번호 암호화하여 처리
+- 세션을 통해 유저 정보 저장, 로그아웃/회원탈퇴 시 세션 destroy
+- 미들웨어를 통해 세션 정보가 있는 유저 요청만 처리
+- 프로필 이미지는 서버에 저장하고, DB에는 이미지 url 저장
+```
+
+#### Posts
+```
+- 게시글 CRUD 기능 구현
+- 미들웨어를 통해 세션 정보가 있는 유저 요청만 처리
+```
+
+#### Comments
+```
+- 댓글 CRUD 기능 구현
+- 미들웨어를 통해 세션 정보가 있는 유저 요청만 처리
+```
+<br/>
+
+## 데이터베이스 설계
+### 요구사항 분석
+`유저 관리`
+- 사용자는 이메일, 프로필 이미지, 비밀번호, 닉네임 정보를 포함하는 유저 관리
+- 각 유저는 고유한 식별자를 가지고 있으며, 이메일과 닉네임은 유니크하게 설정하여 중복 방지
+
+`게시글 관리`
+- 사용자가 제목, 내용, 이미지, 작성일시, 수정일시 등의 정보를 포함하는 게시글 관리
+- 게시글은 작성자를 참조하여 관계를 설정
+
+`댓글 관리`
+- 사용자가 내용, 작성자, 작성일시 등의 정보를 포함하는 댓글 관리
+- 댓글은 어떤 게시글에 속해 있는지 나타내는 참조 포함
+
+`세션 관리`
+- 사용자의 로그인 세션을 관리
+- 세션 식별자, 만료 시간, 세션 데이터를 저장하여 사용자의 세션 추적
+
+### 모델링
+`E-R Diagram`  
+요구사항을 기반으로 모델링한 E-R Diagram입니다.  
+<br/>
+<img src="https://github.com/100-hours-a-week/5-erica-express-be/assets/81230764/1546793d-fd03-47f3-8ed1-449edb764750" width="70%" />
+
+<br/>
+
+## 트러블 슈팅
+추후 작성..
+
+<br/>
+
+## 프로젝트 후기
+사실 상 백엔드를 구현하는 것이 처음이라서 많이 낯설었습니다.  
+프론트엔드만 경험했던 저라서 어떻게 구조를 짜야하고 어떤 방식으로 코드를 짜야 효율적이고 클린한지 고민을 많이 했던 것 같습니다.  
+express로 서버를 만들고, MySQL로 Database를 만들어 연결하는 방식 또한 새로운 지식이어서 힘들었지만 하나하나 해내가며 프로젝트 완성에 가까워지니 재밌어했던 것 같습니다.  
+해당 프로젝트는 express로 구현을 했으니 추후 프로젝트에서는 SpringBoot를 사용해서 서버를 구현해보려고 합니다.  
+백엔드 공부를 열심히 해서 더욱 완성도 있는 프로젝트를 하겠습니다! 
+
+
+<br/>
+<br/>
+<br/>
 
 <p align="center">
-  <img width="700" height="500" alt="다운로드" src="https://github.com/user-attachments/assets/f924c869-7824-4d3d-9277-800b2e6a6d97" />
+  <img src="https://github.com/100-hours-a-week/5-erica-react-fe/assets/81230764/d611b233-b596-4d1d-bbb9-dc2e4e41eb47" style="width:200px; margin: 0 auto"/>
 </p>
-
-
-
-📌 프로젝트 소개
-
-“심야톡방”은 2030 사용자를 대상으로 한 익명 커뮤니티 서비스로,
-
-심야 시간대에 자유롭게 글을 작성하고, 이미지를 공유하며 소통할 수 있도록 설계된 웹 서비스입니다.
-
-FastAPI 기반의 RESTful 백엔드와 MySQL 데이터베이스를 구축하고,
-
-JWT 인증, 이미지 업로드, 게시글/댓글 CRUD 등 커뮤니티 서비스의 핵심 기능을 직접 설계·구현했습니다.
-
-전체 서비스는 Docker 기반으로 컨테이너화하여 Nginx + React(Frontend) + FastAPI(Backend) + MySQL 구조로 AWS EC2에 배포했습니다.
-
-<br><br>
-
-👨‍💻 개발 정보
-
-개발 인원: 1명 (단독 개발)
-
-개발 기간: 2025.11 ~ 2025.12
-
-<br><br>
-
-🛠 Tech Stack
-
-Frontend : React, Vite
-
-Backend : FastAPI, SQLAlchemy ORM, MySQL 8.0
-
-Infra : Docker, Nginx Reverse Proxy, AWS EC2
-
-<br><br>
-
-🚀 주요 기능
-
-🔐 1. JWT 기반 인증/인가
-
-로그인 시 Access Token 발급, LocalStorage 저장
-
-/posts, /profile 등 주요 페이지 접근 보호
-
-토큰 만료 시 자동 로그아웃 및 로그인 페이지로 이동
-
-Refresh Token 없이 Access Token만 사용하는 심플한 구조
-<br><br>
-
-📝 2. 게시글/댓글 CRUD + 이미지 업로드
-
-FastAPI UploadFile 기반 이미지 업로드 처리
-
-게시글 이미지 / 프로필 이미지 저장
-
-좋아요, 조회수 증가 로직 구현
-
-SQLAlchemy ORM 기반의 데이터 정합성 유지
-<br><br>
-
-⚙️ 3. Nginx + Docker 기반 배포 구조
-
-모든 요청을 Nginx가 우선 수신하고 프론트엔드·백엔드 컨테이너로 라우팅하는 구조로 설계
-
-Backend는 내부 Docker 네트워크에서만 접근 가능
-
-CORS, 정적 파일 라우팅, HTTPS 대응 가능
-
-<br><br>
-
-🧠 프로젝트 회고
-### What.
-
-익명 커뮤니티 서비스의 전체 기능을 백엔드부터 프론트, 배포까지 단독으로 구현한 프로젝트입니다.
-
-### How.
-
-FastAPI 기반 백엔드 설계 및 REST API 구현
-
-JWT 인증/인가 + RequireAuth 라우팅 가드
-
-이미지 업로드/정적 파일 문제를 Nginx + FastAPI StaticFiles 조합으로 해결
-
-Docker 기반 배포 + AWS EC2 서버 환경 구성
-
-### Then.
-
-서비스 기획 → API 개발 → DB 모델링 → 배포/운영까지
-
-웹 서비스의 전체 생애주기를 실질적으로 경험하며, 프로덕션 환경에서 서비스가 어떻게 동작하는지 명확히 이해하게 되었습니다.
