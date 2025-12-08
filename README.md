@@ -31,40 +31,36 @@
   <summary>폴더 구조 보기/숨기기</summary>
   <div markdown="1">
     
-      ├── README.md
-      ├── package-lock.json
-      ├── package.json
-      ├── app.js
-      ├── .prettierrc
-      ├── config
-      │    └── mysql.cjs
-      ├── controller
-      │    ├── comment-controller.cjs
-      │    ├── post-controller.cjs
-      │    └── user-controller.cjs
-      ├── images
-      │    ├── post/
-      │    └── profile/
-      ├── middleware
-      │    ├── authUser.cjs
-      │    └── validation.cjs
-      ├── model
-      │    ├── comments.cjs
-      │    ├── posts.cjs
-      │    └── users.cjs
-      ├── queries
-      │    ├── comments.cjs
-      │    ├── posts.cjs
-      │    └── users.cjs
-      ├── routes
-      │    ├── comment.cjs
-      │    ├── post.cjs
-      │    ├── user.cjs
-      │     postImage.cjs
-      │    └── profileImage.cjs
-      └── tools
-           ├── queryUtils.cjs
-           └── dataUtils.js
+      ktb_community_backend
+      │
+      ├── app
+      │   ├── core                # 보안 / 설정
+      │   │    └── security.py
+      │   │
+      │   ├── database.py         # DB 연결
+      │   │
+      │   ├── models              # SQLAlchemy 모델
+      │   │    ├── user_model.py
+      │   │    └── post_model.py
+      │   │
+      │   ├── crud                # DB CRUD 로직
+      │   │    ├── user_crud.py
+      │   │    └── post_crud.py
+      │   │
+      │   ├── controllers         # 비즈니스 로직
+      │   │    ├── auth_controller.py
+      │   │    └── post_controller.py
+      │   │
+      │   ├── dependencies        # Depends() 인증/인가
+      │   │    └── auth.py
+      │   │
+      │   └── routes              # FastAPI 라우터
+      │        ├── auth_router.py
+      │        └── post_router.py
+      │
+      ├── uploads                 # 프로필 이미지
+      └── post_uploads            # 게시글 이미지
+
   </div>
 </details> 
 
@@ -72,75 +68,69 @@
 
 ## 서버 설계
 ### 서버 구조
-||route|controller|model|
-|:---|:---|:---|:---|
-|유저|userRouter|userController|userModel|
-|게시글|postRouter|postController|postModel|
-|댓글|commentRouter|commentController|commentModal|
-|게시글이미지|postImageRouter|-|-|
-|프로필이미지|profileImageRouter|-|-|
+||route|controller|model|CRUD|
+|:---|:---|:---|:---|:---|
+|유저|user_router|user_controller|user_model|user_crud|
+|게시글,댓글|post_router|post_controller|post_model|post_crud|
+
 
 ### 구현 기능
 
 #### Users
 ```
-- 유저 CRUD 기능 구현
-- 회원가입, 로그인, 비밀번호 변경 시 bcrypt로 비밀번호 암호화하여 처리
-- 세션을 통해 유저 정보 저장, 로그아웃/회원탈퇴 시 세션 destroy
-- 미들웨어를 통해 세션 정보가 있는 유저 요청만 처리
-- 프로필 이미지는 서버에 저장하고, DB에는 이미지 url 저장
+- 회원가입, 로그인, 프로필 수정, 비밀번호 변경, 회원탈퇴
+- 비밀번호는 passlib(pbkdf2_sha256)으로 해싱하여 저장
+- FastAPI 의존성 주입(Depends)을 이용해 JWT에서 현재 유저 정보 추출
+- 회원가입 시 이메일/닉네임 중복 체크 및 기본 검증 로직 구현
+- 프로필 이미지는 서버 폴더에 저장하고, DB에는 이미지 경로만 저장
 ```
 
 #### Posts
 ```
-- 게시글 CRUD 기능 구현
-- 미들웨어를 통해 세션 정보가 있는 유저 요청만 처리
+- 게시글 생성, 조회(단건/목록), 수정, 삭제 기능 구현
+- 이미지 첨부 시 UploadFile로 서버에 저장 후 image_path 컬럼에 경로 저장
+- 작성자(user_id)와의 FK 관계를 통해 유저-게시글 연관 관리
+- 좋아요(likes), 조회수(views) 컬럼으로 간단한 피드백 기능 제공
 ```
 
-#### Comments
-```
-- 댓글 CRUD 기능 구현
-- 미들웨어를 통해 세션 정보가 있는 유저 요청만 처리
-```
 <br/>
 
 ## 데이터베이스 설계
 ### 요구사항 분석
 `유저 관리`
-- 사용자는 이메일, 프로필 이미지, 비밀번호, 닉네임 정보를 포함하는 유저 관리
-- 각 유저는 고유한 식별자를 가지고 있으며, 이메일과 닉네임은 유니크하게 설정하여 중복 방지
+- 이메일, 비밀번호, 닉네임, 프로필 이미지 경로 등을 포함
+- 이메일/닉네임은 유니크 제약 조건으로 중복 방지
 
 `게시글 관리`
-- 사용자가 제목, 내용, 이미지, 작성일시, 수정일시 등의 정보를 포함하는 게시글 관리
-- 게시글은 작성자를 참조하여 관계를 설정
+- 제목, 내용, 이미지 경로, 좋아요 수, 조회수, 작성일시 등의 정보 포함
+- 작성자는 User 테이블의 FK로 참조
 
 `댓글 관리`
-- 사용자가 내용, 작성자, 작성일시 등의 정보를 포함하는 댓글 관리
-- 댓글은 어떤 게시글에 속해 있는지 나타내는 참조 포함
+- 댓글 내용, 작성자, 작성일시 정보 포함
+- 어떤 게시글에 달린 댓글인지 Post를 참조
 
-`세션 관리`
-- 사용자의 로그인 세션을 관리
-- 세션 식별자, 만료 시간, 세션 데이터를 저장하여 사용자의 세션 추적
-
-### 모델링
-`E-R Diagram`  
-요구사항을 기반으로 모델링한 E-R Diagram입니다.  
-<br/>
-<img src="https://github.com/100-hours-a-week/5-erica-express-be/assets/81230764/1546793d-fd03-47f3-8ed1-449edb764750" width="70%" />
+`JWT 기반 인증 관리`
+- 서버 세션을 사용하지 않고, Stateless 인증 방식인 JWT(Json Web Token)를 사용하여 로그인 상태를 유지
+- 인증이 필요한 모든 요청은 Authorization: Bearer <token> 헤더를 통해 토큰을 전달하며, 서버에서는 해당 토큰을 검증하여 유저 정보를 확인
+- 토큰 검증은 get_current_user 의존성(FastAPI Depends)을 통해 자동화되며, 만료되었거나 위조된 토큰의 경우 401 Unauthorized를 반환하여 보안을 유지
 
 <br/>
 
 ## 트러블 슈팅
-추후 작성..
+..
 
 <br/>
 
 ## 프로젝트 후기
-사실 상 백엔드를 구현하는 것이 처음이라서 많이 낯설었습니다.  
-프론트엔드만 경험했던 저라서 어떻게 구조를 짜야하고 어떤 방식으로 코드를 짜야 효율적이고 클린한지 고민을 많이 했던 것 같습니다.  
-express로 서버를 만들고, MySQL로 Database를 만들어 연결하는 방식 또한 새로운 지식이어서 힘들었지만 하나하나 해내가며 프로젝트 완성에 가까워지니 재밌어했던 것 같습니다.  
-해당 프로젝트는 express로 구현을 했으니 추후 프로젝트에서는 SpringBoot를 사용해서 서버를 구현해보려고 합니다.  
-백엔드 공부를 열심히 해서 더욱 완성도 있는 프로젝트를 하겠습니다! 
+단순히 API 몇 개를 만드는 수준이 아니라, 인증·데이터 모델링·이미지 처리·Docker 기반 배포·Nginx 프록시 설정까지 
+
+실제 서비스가 갖춰야 할 전 과정을 직접 설계하고 구현했습니다.
+
+JWT 기반 인증 시스템을 직접 설계하면서, 토큰 생성·만료·검증 흐름, get_current_user 의존성을 통한 자동 인증 처리 등
+
+서버가 상태를 저장하지 않는 Stateless 아키텍처에 대한 이해가 깊어졌습니다.
+
+마지막으로, Docker + EC2 배포를 통해 로컬에서 만들던 코드가 서비스가 되는 순간 큰 성취감을 느꼈고, 서버 운영에 대한 자신감도 생겼습니다.
 
 
 <br/>
