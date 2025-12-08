@@ -9,13 +9,14 @@
 📌 프로젝트 소개
 
 “심야톡방”은 2030 사용자를 대상으로 한 익명 커뮤니티 서비스로,
+
 심야 시간대에 자유롭게 글을 작성하고, 이미지를 공유하며 소통할 수 있도록 설계된 웹 서비스입니다.
 
 FastAPI 기반의 RESTful 백엔드와 MySQL 데이터베이스를 구축하고,
+
 JWT 인증, 이미지 업로드, 게시글/댓글 CRUD 등 커뮤니티 서비스의 핵심 기능을 직접 설계·구현했습니다.
 
-전체 서비스는 Docker 기반으로 컨테이너화하여
-Nginx Reverse Proxy + FastAPI + MySQL 구조로 AWS EC2에 배포했습니다.
+전체 서비스는 Docker 기반으로 컨테이너화하여 Nginx + React(Frontend) + FastAPI(Backend) + MySQL 구조로 AWS EC2에 배포했습니다.
 
 <br><br>
 
