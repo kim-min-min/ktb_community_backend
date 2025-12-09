@@ -136,7 +136,3 @@ JWT 기반 인증 시스템을 직접 설계하면서, 토큰 생성·만료·�
 <br/>
 <br/>
 <br/>
-
-<p align="center">
-  <img src="https://github.com/100-hours-a-week/5-erica-react-fe/assets/81230764/d611b233-b596-4d1d-bbb9-dc2e4e41eb47" style="width:200px; margin: 0 auto"/>
-</p>
