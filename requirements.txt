@@ -11,3 +11,5 @@ passlib
 
 python-dotenv
 pydantic
+
+prometheus-fastapi-instrumentator

@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.auth_router import router as auth_router
 from app.routes.post_router import router as post_router
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # 테이블 자동 생성용
 from app.models.user_model import User   
@@ -31,6 +32,9 @@ Base.metadata.create_all(bind=engine)
 # 라우터 등록
 app.include_router(auth_router)
 app.include_router(post_router)
+
+# Instrumentator 장착 
+Instrumentator().instrument(app).expose(app)
 
 
 app.mount(
