@@ -4,6 +4,7 @@ from app.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes.auth_router import router as auth_router
 from app.routes.post_router import router as post_router
+from app.routes.internal_router import router as internal_router
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -32,6 +33,7 @@ Base.metadata.create_all(bind=engine)
 # 라우터 등록
 app.include_router(auth_router)
 app.include_router(post_router)
+app.include_router(internal_router)
 
 # Instrumentator 장착 
 Instrumentator().instrument(app).expose(app)

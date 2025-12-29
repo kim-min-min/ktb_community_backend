@@ -2,6 +2,9 @@
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 import os, uuid
+import requests
+
+
 
 from app.crud.post_crud import (
     create_post,
@@ -19,7 +22,7 @@ from app.models.user_model import User   # 추가
 
 POST_UPLOAD_DIR = "post_uploads"
 os.makedirs(POST_UPLOAD_DIR, exist_ok=True)
-
+AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "").rstrip("/")
 
 # -----------------------------
 # 게시글 목록 조회
@@ -29,7 +32,7 @@ def list_posts_controller(
     last_id: int | None,
     size: int,
 ) -> dict:
-    posts = list_posts_cursor(db, last_id, size)
+    posts = list_posts_cursor(db, last_id, size, exclude_hidden=True)
 
     result: list[dict] = []
     for p in posts:
@@ -99,6 +102,8 @@ async def create_post_controller(
     # user.id 를 함께 넘겨서 user_id 컬럼에 저장하도록
     post = create_post(db, title, content, image_path, user_id=user.id)
 
+    trigger_moderation_async(post.id, post.content)
+    
     return {"success": True, "message": "게시글이 등록되었습니다.", "post": post}
 
 
@@ -294,3 +299,26 @@ async def update_post_controller(
     )
 
     return {"success": True, "message": "게시글이 수정되었습니다.", "post": post}
+
+
+
+
+# -----------------------------
+# agent 트리거
+# -----------------------------
+def trigger_moderation_async(post_id: int, content: str):
+    if not AGENT_BASE_URL:
+        return
+    try:
+        requests.post(
+            f"{AGENT_BASE_URL}/moderate",
+            json={"post_id": post_id, "content": content},
+            headers={"X-Internal-Call": "true"},
+            timeout=0.5,
+        )
+    except Exception:
+        pass
+
+
+
+        

@@ -18,6 +18,10 @@ class Post(Base):
     views = Column(Integer, default=0)
     created_at = Column(DateTime, default=lambda: datetime.now(KST))
 
+    # agent용 추가
+    moderation_status = Column(String(20), default="PENDING", nullable=False)
+    moderation_reason = Column(String(255), nullable=True)
+
     # 글쓴이 (User FK)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 

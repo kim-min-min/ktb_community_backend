@@ -11,7 +11,7 @@ from app.models.post_model import Post, Comment
 # -----------------------------
 def get_post_or_404(db: Session, post_id: int) -> Post:
     """id로 게시글 조회. 없으면 404"""
-    post = db.query(Post).filter(Post.id == post_id).first()
+    post = db.query(Post).filter(Post.id == post_id, Post.moderation_status != "HIDDEN").first()
     if post is None:
         raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
     return post
@@ -23,10 +23,12 @@ def list_posts_cursor(
     db: Session,
     last_id: int | None,
     size: int,
+    exclude_hidden: bool = False, 
 ) -> List[Post]:
     query = (
         db.query(Post)
         .options(joinedload(Post.user))   # 작성자 정보 함께 로딩
+        .filter(Post.moderation_status != "HIDDEN")  # 숨김 추가
         .order_by(Post.id.desc())
     )
 
@@ -215,3 +217,28 @@ def delete_comment(
     # 남은 댓글 개수
     remaining = db.query(Comment).filter(Comment.post_id == post_id).count()
     return remaining
+
+
+
+def apply_moderation_result(
+    db: Session,
+    post_id: int,
+    action: str,
+    reason: str | None,
+) -> None:
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if post is None:
+        # 이미 삭제된 글일 수도 있으니 종료해도 됨
+        return
+
+    if action == "SAFE":
+        post.moderation_status = "SAFE"
+        post.moderation_reason = None
+    elif action == "HIDDEN":
+        post.moderation_status = "HIDDEN"
+        post.moderation_reason = reason
+    else:  # REVIEW 포함
+        post.moderation_status = "REVIEW"
+        post.moderation_reason = reason
+
+    db.commit()

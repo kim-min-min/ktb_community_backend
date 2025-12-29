@@ -1,0 +1,38 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: ktb_db
+    environment:
+      MYSQL_ROOT_PASSWORD: 1q2w3e4r
+      MYSQL_DATABASE: ktb_community
+      MYSQL_USER: ktb_user
+      MYSQL_PASSWORD: 1q2w3e4r
+    ports:
+      - "3307:3306"
+    volumes:
+      - ktb_db_data:/var/lib/mysql
+    command: ["--default-authentication-plugin=mysql_native_password"]
+
+  backend:
+    image: kaner0529/ktb_backend:local
+    container_name: ktb_backend
+    ports:
+      - "5000:8000"
+    env_file:
+      - ./ktb_community_backend/.env
+    depends_on:
+      - db
+    environment:
+      # AI 서버(EC2-B)의 주소로 변경
+      - AGENT_BASE_URL=http://<AI_EC2_PUBLIC_IP_OR_DOMAIN>:8000
+
+  frontend:
+    image: kaner0529/ktb_frontend:local
+    container_name: ktb_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  ktb_db_data:
