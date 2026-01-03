@@ -231,14 +231,23 @@ def apply_moderation_result(
         # 이미 삭제된 글일 수도 있으니 종료해도 됨
         return
 
-    if action == "SAFE":
+    a = (action or "").strip().lower()
+
+    if a == "safe":
         post.moderation_status = "SAFE"
         post.moderation_reason = None
-    elif action == "HIDDEN":
+
+    elif a == "hidden":
         post.moderation_status = "HIDDEN"
         post.moderation_reason = reason
-    else:  # REVIEW 포함
+
+    elif a == "review":
         post.moderation_status = "REVIEW"
         post.moderation_reason = reason
+
+    else:
+        # 알 수 없는 액션이면 안전하게 검토로 보냄
+        post.moderation_status = "REVIEW"
+        post.moderation_reason = (reason or "").strip() or f"unknown action: {action}"
 
     db.commit()

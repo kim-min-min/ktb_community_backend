@@ -22,9 +22,6 @@ services:
       - ./ktb_community_backend/.env
     depends_on:
       - db
-    environment:
-      # AI 서버(EC2-B)의 주소로 변경
-      - AGENT_BASE_URL=http://<AI_EC2_PUBLIC_IP_OR_DOMAIN>:8000
 
   frontend:
     image: kaner0529/ktb_frontend:local

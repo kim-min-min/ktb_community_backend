@@ -1,5 +1,5 @@
 # app/controllers/post_controller.py
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException, UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 import os, uuid
 import requests
@@ -70,6 +70,7 @@ async def create_post_controller(
     content: str,
     image_file: UploadFile | None,
     user: User,                       # 현재 로그인 유저
+    background_tasks: BackgroundTasks,
 ) -> dict:
 
     title = title.strip()
@@ -102,7 +103,7 @@ async def create_post_controller(
     # user.id 를 함께 넘겨서 user_id 컬럼에 저장하도록
     post = create_post(db, title, content, image_path, user_id=user.id)
 
-    trigger_moderation_async(post.id, post.content)
+    background_tasks.add_task(trigger_moderation, post.id, post.content)
     
     return {"success": True, "message": "게시글이 등록되었습니다.", "post": post}
 
@@ -306,7 +307,7 @@ async def update_post_controller(
 # -----------------------------
 # agent 트리거
 # -----------------------------
-def trigger_moderation_async(post_id: int, content: str):
+def trigger_moderation(post_id: int, content: str):
     if not AGENT_BASE_URL:
         return
     try:
@@ -314,7 +315,7 @@ def trigger_moderation_async(post_id: int, content: str):
             f"{AGENT_BASE_URL}/moderate",
             json={"post_id": post_id, "content": content},
             headers={"X-Internal-Call": "true"},
-            timeout=0.5,
+            timeout=3,
         )
     except Exception:
         pass

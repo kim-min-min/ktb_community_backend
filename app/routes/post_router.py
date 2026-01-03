@@ -1,5 +1,5 @@
 # app/routes/post_router.py
-from fastapi import APIRouter, Form, File, UploadFile, Body, Depends, Query
+from fastapi import APIRouter, Form, File, UploadFile, Body, Depends, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.dependencies.auth import get_current_user
@@ -52,18 +52,20 @@ def get_post(
 # -----------------------------
 @router.post("")
 async def create_post(
+    background_tasks: BackgroundTasks,          
     title: str = Form(...),
     content: str = Form(...),
     image_file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),  
+    current_user: User = Depends(get_current_user),
 ):
     return await create_post_controller(
         db=db,
         title=title,
         content=content,
         image_file=image_file,
-        user=current_user,                         
+        user=current_user,
+        background_tasks=background_tasks,      
     )
 
 
