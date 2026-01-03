@@ -23,6 +23,9 @@
 ### Front-end
 - <a href="https://github.com/kim-min-min/ktb_community_frontend">Front-end Github</a>
 
+### Ai-agent
+- <a href="https://github.com/kim-min-min/ktb_community_agent">Ai-agent Github</a>
+
 ### 서비스 시연 영상
 - <a href="https://drive.google.com/file/d/1JmQPlFyiUH4cPl8w_QxjE26AFf08FlRe/view?usp=drive_link">구글 드라이브</a>
 
