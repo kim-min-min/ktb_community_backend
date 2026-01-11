@@ -3,6 +3,8 @@ from fastapi import HTTPException, UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 import os, uuid
 import requests
+from app.models.post_model import Comment
+
 
 
 
@@ -32,7 +34,7 @@ def list_posts_controller(
     last_id: int | None,
     size: int,
 ) -> dict:
-    posts = list_posts_cursor(db, last_id, size, exclude_hidden=True)
+    posts = list_posts_cursor(db, last_id, size)
 
     result: list[dict] = []
     for p in posts:
@@ -70,7 +72,7 @@ async def create_post_controller(
     content: str,
     image_file: UploadFile | None,
     user: User,                       # 현재 로그인 유저
-    background_tasks: BackgroundTasks,
+    background_tasks: BackgroundTasks | None,
 ) -> dict:
 
     title = title.strip()
@@ -102,8 +104,8 @@ async def create_post_controller(
 
     # user.id 를 함께 넘겨서 user_id 컬럼에 저장하도록
     post = create_post(db, title, content, image_path, user_id=user.id)
-
-    background_tasks.add_task(trigger_moderation, post.id, post.content)
+    if background_tasks:
+        background_tasks.add_task(trigger_moderation, "post", post.id, post.content)
     
     return {"success": True, "message": "게시글이 등록되었습니다.", "post": post}
 
@@ -114,8 +116,16 @@ async def create_post_controller(
 def get_post_detail_controller(db: Session, post_id: int) -> dict:
     post = increase_views(db, post_id)
 
-    # 댓글을 created_at 기준으로 정렬하고 싶으면:
-    comments = sorted(post.comments, key=lambda c: c.created_at)
+    # 댓글을 created_at 기준으로 정렬:
+    comments = (
+        db.query(Comment)
+        .filter(
+            Comment.post_id == post.id,
+            Comment.moderation_status != "HIDDEN",
+        )
+        .order_by(Comment.created_at.asc())
+        .all()
+    )
 
     comment_list: list[dict] = []
     for c in comments:
@@ -191,21 +201,32 @@ def add_comment_controller(
     db: Session,
     post_id: int,
     content: str,
-    user: User,          # 로그인 유저
+    user: User,
+    background_tasks: BackgroundTasks | None,
 ) -> dict:
     if not content.strip():
         raise HTTPException(400, "댓글 내용을 입력해주세요.")
 
-    # writer는 화면용 닉네임, user_id는 FK
     data = add_comment(
         db=db,
         post_id=post_id,
         content=content,
-        user_id=user.id,             # FK
-        writer=user.nickname,        # 화면 표시용
+        user_id=user.id,
+        writer=user.nickname,
     )
 
-    return {"success": True, "comment": data["comment"]}
+    comment = data["comment"]
+
+    if background_tasks:
+        background_tasks.add_task(
+            trigger_moderation,
+            "comment",          # target_type
+            comment.id,         # target_id
+            comment.content,    # content
+        )
+
+    return {"success": True, "comment": comment}
+
 
 
 # -----------------------------
@@ -216,13 +237,12 @@ def update_comment_controller(
     post_id: int,
     comment_id: int,
     content: str,
-    user: User,          # 로그인 유저
+    user: User,
+    background_tasks: BackgroundTasks | None,
 ) -> dict:
     if not content.strip():
         raise HTTPException(400, "댓글 내용을 입력해주세요.")
 
-    # 컨트롤러에서 직접 권한 체크할 수도 있고,
-    # crud에서 user_id를 받아서 체크하도록 할 수도 있음.
     comment = update_comment(
         db=db,
         post_id=post_id,
@@ -230,6 +250,13 @@ def update_comment_controller(
         content=content,
         user_id=user.id,    # 본인 댓글인지 crud쪽에서 확인 가능하게
     )
+    if background_tasks:
+        background_tasks.add_task(
+            trigger_moderation,
+            "comment",
+            comment.id,
+            comment.content,
+        )
     return {"success": True, "comment": comment}
 
 
@@ -260,7 +287,8 @@ async def update_post_controller(
     title: str,
     content: str,
     image_file: UploadFile | None,
-    user: User,          # 로그인 유저
+    user: User,         
+    background_tasks: BackgroundTasks | None,
 ) -> dict:
 
     title = title.strip()
@@ -298,6 +326,14 @@ async def update_post_controller(
         new_image_path=new_image_path,
         user_id=user.id,      # 작성자 검증용
     )
+    
+    if background_tasks:
+        background_tasks.add_task(
+            trigger_moderation,
+            "post",
+            post.id,
+            post.content,
+        )
 
     return {"success": True, "message": "게시글이 수정되었습니다.", "post": post}
 
@@ -307,18 +343,23 @@ async def update_post_controller(
 # -----------------------------
 # agent 트리거
 # -----------------------------
-def trigger_moderation(post_id: int, content: str):
+def trigger_moderation(target_type: str, target_id: int, content: str):
     if not AGENT_BASE_URL:
         return
     try:
         requests.post(
             f"{AGENT_BASE_URL}/moderate",
-            json={"post_id": post_id, "content": content},
+            json={
+                "target_type": target_type,
+                "target_id": target_id,
+                "content": content,
+            },
             headers={"X-Internal-Call": "true"},
             timeout=3,
         )
     except Exception:
         pass
+
 
 
 

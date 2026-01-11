@@ -94,6 +94,7 @@ async def update_post(
     title: str = Form(...),
     content: str = Form(...),
     image_file: UploadFile | None = File(None),
+    background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),   
 ):
@@ -103,7 +104,8 @@ async def update_post(
         title=title,
         content=content,
         image_file=image_file,
-        user=current_user,                           
+        user=current_user,
+        background_tasks=background_tasks,                           
     )
     
 
@@ -127,6 +129,7 @@ def toggle_like(
 @router.post("/{post_id}/comments")
 def add_comment(
     post_id: int,
+    background_tasks: BackgroundTasks = None,
     content: str = Form(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),   
@@ -135,7 +138,8 @@ def add_comment(
         db=db,
         post_id=post_id,
         content=content,
-        user=current_user,                           
+        user=current_user,
+        background_tasks=background_tasks,
     )
 
 
@@ -147,6 +151,7 @@ def add_comment(
 def update_comment(
     post_id: int,
     comment_id: int,
+    background_tasks: BackgroundTasks = None,
     content: str = Form(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),   
@@ -156,7 +161,8 @@ def update_comment(
         post_id=post_id,
         comment_id=comment_id,
         content=content,
-        user=current_user,                             
+        user=current_user,
+        background_tasks=background_tasks,
     )
 
 

@@ -7,7 +7,6 @@ from app.crud.post_crud import apply_moderation_result
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
-
 @router.post("/moderation-result")
 def moderation_result(
     body: ModerationResult,
@@ -20,9 +19,11 @@ def moderation_result(
 
     apply_moderation_result(
         db=db,
-        post_id=body.post_id,
+        target_type=body.target_type,
+        target_id=body.target_id,
         action=body.action,
         reason=body.reason,
     )
 
     return {"success": True}
+

@@ -52,6 +52,9 @@ class Comment(Base):
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(KST))
 
+    moderation_status = Column(String(20), default="PENDING", nullable=False)
+    moderation_reason = Column(String(255), nullable=True)
+
     # 관계
     # Comment.post → Post
     post = relationship("Post", back_populates="comments")

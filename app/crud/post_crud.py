@@ -23,7 +23,6 @@ def list_posts_cursor(
     db: Session,
     last_id: int | None,
     size: int,
-    exclude_hidden: bool = False, 
 ) -> List[Post]:
     query = (
         db.query(Post)
@@ -196,7 +195,7 @@ def delete_comment(
     db: Session,
     post_id: int,
     comment_id: int,
-    user_id: int,              # 요청한 사용자 ID
+    user_id: int,
 ) -> int:
     """댓글 삭제 후 남은 댓글 개수 반환 (작성자 본인만)"""
     comment = (
@@ -207,47 +206,55 @@ def delete_comment(
     if comment is None:
         raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
 
-    # 권한 체크
     if comment.user_id != user_id:
         raise HTTPException(status_code=403, detail="본인이 작성한 댓글만 삭제할 수 있습니다.")
 
     db.delete(comment)
     db.commit()
 
-    # 남은 댓글 개수
-    remaining = db.query(Comment).filter(Comment.post_id == post_id).count()
+    remaining = (
+        db.query(Comment)
+        .filter(
+            Comment.post_id == post_id,
+            Comment.moderation_status != "HIDDEN",  # 숨김 제외
+        )
+        .count()
+    )
+
     return remaining
+
 
 
 
 def apply_moderation_result(
     db: Session,
-    post_id: int,
+    target_type: str,   # "post" or "comment"
+    target_id: int,     # post_id or comment_id
     action: str,
     reason: str | None,
 ) -> None:
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if post is None:
-        # 이미 삭제된 글일 수도 있으니 종료해도 됨
-        return
-
+    t = (target_type or "").strip().lower()
     a = (action or "").strip().lower()
 
-    if a == "safe":
-        post.moderation_status = "SAFE"
-        post.moderation_reason = None
-
-    elif a == "hidden":
-        post.moderation_status = "HIDDEN"
-        post.moderation_reason = reason
-
-    elif a == "review":
-        post.moderation_status = "REVIEW"
-        post.moderation_reason = reason
-
+    if t == "post":
+        obj = db.query(Post).filter(Post.id == target_id).first()
+    elif t == "comment":
+        obj = db.query(Comment).filter(Comment.id == target_id).first()
     else:
-        # 알 수 없는 액션이면 안전하게 검토로 보냄
-        post.moderation_status = "REVIEW"
-        post.moderation_reason = (reason or "").strip() or f"unknown action: {action}"
+        return
+
+    if obj is None:
+        return
+
+    if a == "safe":
+        obj.moderation_status = "SAFE"
+        obj.moderation_reason = None
+    elif a == "hidden":
+        obj.moderation_status = "HIDDEN"
+        obj.moderation_reason = reason
+    else:
+        obj.moderation_status = "REVIEW"
+        obj.moderation_reason = reason or f"unknown action: {action}"
 
     db.commit()
+
