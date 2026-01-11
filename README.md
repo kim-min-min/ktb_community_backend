@@ -27,7 +27,7 @@
 - <a href="https://github.com/kim-min-min/ktb_community_agent">Ai-agent Github</a>
 
 ### 서비스 시연 영상
-- <a href="https://drive.google.com/file/d/1JmQPlFyiUH4cPl8w_QxjE26AFf08FlRe/view?usp=drive_link">구글 드라이브</a>
+- <a href="https://drive.google.com/file/d/1EFPE-c6l2ZpRBqjgo9JXuCmcw59apmQF/view?usp=sharing">구글 드라이브</a>
 
 ### 폴더 구조
 <details>
