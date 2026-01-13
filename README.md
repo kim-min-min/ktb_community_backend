@@ -5,6 +5,7 @@
 - 2030 사용자가 밤에 편하게 아무 말이든 털어놓을 수 있는 익명 커뮤니티 서비스입니다.
 - FastAPI로 REST API 서버를 구현하고, MySQL을 RDBMS로 사용했습니다.
 - JWT 기반 인증, 게시글/댓글 CRUD, 이미지 업로드, 실제 서비스에 필요한 기능들을 처음부터 끝까지 직접 구현했습니다.
+- Redis를 도입하여 게시글·댓글 작성 시 수행되는 AI 모더레이션 작업을 비동기로 처리하고, 요청 폭주 상황에서도 API 응답 지연 없이 서비스가 동작하도록 설계했습니다.
 - Router–Controller–CRUD–Model 패턴으로 구조를 나누고, Docker + Nginx로 컨테이너화하여 AWS EC2에 배포했습니다.
 
 ### 개발 인원 및 기간
@@ -15,6 +16,7 @@
 ### 사용 기술 및 tools
 - MySQL
 - FastAPI
+- Redis
 - Docker
 - Nginx
 - AWS
@@ -37,6 +39,7 @@
       ktb_community_backend
       │
       ├── app
+      │   │
       │   ├── core                # 보안 / 설정
       │   │    └── security.py
       │   │
@@ -57,24 +60,31 @@
       │   ├── dependencies        # Depends() 인증/인가
       │   │    └── auth.py
       │   │
-      │   └── routes              # FastAPI 라우터
-      │        ├── auth_router.py
-      │        └── post_router.py
+      │   ├── routes              # FastAPI 라우터
+      │   │    ├── auth_router.py
+      │   │    ├── post_router.py
+      │   │    └── internal_router.py  # 내부용 API (헬스체크/큐 등)
+      │   │
+      │   ├── schemas.py          # Pydantic 스키마(요청/응답 DTO)
+      │   ├── queue.py            # Redis 큐/클라이언트 연결 및 enqueue 로직
+      │   └── jobs.py             # 비동기 작업 정의(모더레이션 등)
       │
       ├── uploads                 # 프로필 이미지
       └── post_uploads            # 게시글 이미지
 
   </div>
-</details> 
+</details>
 
 <br/>
 
 ## 서버 설계
 ### 서버 구조
-||route|controller|model|CRUD|
-|:---|:---|:---|:---|:---|
-|유저|user_router|user_controller|user_model|user_crud|
-|게시글,댓글|post_router|post_controller|post_model|post_crud|
+|도메인|route|controller|schema|model|CRUD|비고|
+|:---|:---|:---|:---|:---|:---|:---|
+|유저|auth_router|auth_controller|User 관련 schema|user_model|user_crud|JWT 인증/인가|
+|게시글/댓글|post_router|post_controller|Post/Comment schema|post_model|post_crud|CRUD + 이미지 업로드|
+|비동기 작업|-|jobs.py|-|-|post_crud|Redis Queue 소비 후 DB 반영|
+|큐/브로커|-|queue.py|-|-|-|Redis enqueue/dequeue 관리|
 
 
 ### 구현 기능
@@ -132,6 +142,10 @@
 JWT 기반 인증 시스템을 직접 설계하면서, 토큰 생성·만료·검증 흐름, get_current_user 의존성을 통한 자동 인증 처리 등
 
 서버가 상태를 저장하지 않는 Stateless 아키텍처에 대한 이해가 깊어졌습니다.
+
+또한 게시글·댓글 작성 시 수행되는 AI 모더레이션 기능을 Redis Queue 기반 비동기 처리 구조로 분리하면서,
+
+API 응답 속도와 시스템 안정성을 동시에 고려한 설계를 경험했습니다.
 
 
 <br/>
