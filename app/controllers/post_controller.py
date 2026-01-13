@@ -2,9 +2,9 @@
 from fastapi import HTTPException, UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 import os, uuid
-import requests
 from app.models.post_model import Comment
-
+from app.queue import redis, moderation_q
+from app.jobs import run_moderation
 
 
 
@@ -24,7 +24,6 @@ from app.models.user_model import User   # 추가
 
 POST_UPLOAD_DIR = "post_uploads"
 os.makedirs(POST_UPLOAD_DIR, exist_ok=True)
-AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "").rstrip("/")
 
 # -----------------------------
 # 게시글 목록 조회
@@ -104,8 +103,7 @@ async def create_post_controller(
 
     # user.id 를 함께 넘겨서 user_id 컬럼에 저장하도록
     post = create_post(db, title, content, image_path, user_id=user.id)
-    if background_tasks:
-        background_tasks.add_task(trigger_moderation, "post", post.id, post.content)
+    trigger_moderation("post", post.id, post.content)
     
     return {"success": True, "message": "게시글이 등록되었습니다.", "post": post}
 
@@ -216,14 +214,7 @@ def add_comment_controller(
     )
 
     comment = data["comment"]
-
-    if background_tasks:
-        background_tasks.add_task(
-            trigger_moderation,
-            "comment",          # target_type
-            comment.id,         # target_id
-            comment.content,    # content
-        )
+    trigger_moderation("comment", comment.id, comment.content)
 
     return {"success": True, "comment": comment}
 
@@ -250,13 +241,7 @@ def update_comment_controller(
         content=content,
         user_id=user.id,    # 본인 댓글인지 crud쪽에서 확인 가능하게
     )
-    if background_tasks:
-        background_tasks.add_task(
-            trigger_moderation,
-            "comment",
-            comment.id,
-            comment.content,
-        )
+    trigger_moderation("comment", comment.id, comment.content)
     return {"success": True, "comment": comment}
 
 
@@ -327,13 +312,7 @@ async def update_post_controller(
         user_id=user.id,      # 작성자 검증용
     )
     
-    if background_tasks:
-        background_tasks.add_task(
-            trigger_moderation,
-            "post",
-            post.id,
-            post.content,
-        )
+    trigger_moderation("post", post.id, post.content)
 
     return {"success": True, "message": "게시글이 수정되었습니다.", "post": post}
 
@@ -344,21 +323,22 @@ async def update_post_controller(
 # agent 트리거
 # -----------------------------
 def trigger_moderation(target_type: str, target_id: int, content: str):
-    if not AGENT_BASE_URL:
+    lock_key = f"moderation:lock:{target_type}:{target_id}"
+
+    # 중복 enqueue 방지 (2분)
+    if not redis.set(lock_key, "1", nx=True, ex=120):
         return
-    try:
-        requests.post(
-            f"{AGENT_BASE_URL}/moderate",
-            json={
-                "target_type": target_type,
-                "target_id": target_id,
-                "content": content,
-            },
-            headers={"X-Internal-Call": "true"},
-            timeout=3,
-        )
-    except Exception:
-        pass
+
+    moderation_q.enqueue(
+        run_moderation,
+        target_type,
+        target_id,
+        content,
+        job_timeout=60,     # 실행 제한
+        result_ttl=600,     # 결과 보관(옵션)
+        failure_ttl=600,    # 실패 보관(옵션)
+    )
+
 
 
 

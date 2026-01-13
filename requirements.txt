@@ -14,4 +14,7 @@ pydantic
 
 requests
 
+redis
+rq
+
 prometheus-fastapi-instrumentator
