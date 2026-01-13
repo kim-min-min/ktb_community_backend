@@ -127,6 +127,10 @@
 - 인증이 필요한 모든 요청은 Authorization: Bearer <token> 헤더를 통해 토큰을 전달하며, 서버에서는 해당 토큰을 검증하여 유저 정보를 확인
 - 토큰 검증은 get_current_user 의존성(FastAPI Depends)을 통해 자동화되며, 만료되었거나 위조된 토큰의 경우 401 Unauthorized를 반환하여 보안을 유지
 
+`Redis 기반 비동기 모더레이션 관리`
+- 게시글/댓글 생성 시 Redis(RQ) 큐에 모더레이션 작업을 비동기로 enqueue하여 API 응답 지연을 최소화한다.
+- RQ 워커가 큐의 작업을 처리해 AI 모더레이션 결과(safe/hidden/review)를 판단하고 DB에 반영한다.
+
 <br/>
 
 ## 트러블 슈팅
